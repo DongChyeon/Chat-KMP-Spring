@@ -18,7 +18,7 @@ docs/learning/ 장애 실험 기록
 ## 실행
 
 ```bash
-docker compose up -d --wait     # PostgreSQL, Redis
+docker compose up -d --wait     # 로컬 DB (PostgreSQL, 잠정)
 ./gradlew :server:bootRun       # http://localhost:8080/api/info
 ```
 
