@@ -3,10 +3,26 @@
 실시간 채팅 서비스. **백엔드 학습이 1차 목적**인 프로젝트.
 오너는 모바일 개발 3년차이고 백엔드는 처음이다.
 
-- `server/`: Spring Boot (Kotlin, Gradle Kotlin DSL)
-- `shared/`: KMP 공통 모듈 (DTO, 메시지 프로토콜). server는 JVM 타깃을 의존
-- `composeApp/`, `iosApp/`: Compose Multiplatform 앱
-- 인프라: PostgreSQL, Redis, Docker
+| 모듈 | 역할 | 의존 |
+|---|---|---|
+| `server/` | Spring Boot 4 (Kotlin, JDK 21) | `shared` (JVM 타깃) |
+| `shared/` | 서버와 앱이 함께 쓰는 순수 Kotlin 코드: DTO, API 경로, 메시지 프로토콜. **UI 의존성 금지** | 없음 |
+| `composeApp/` | Compose Multiplatform UI (Android/iOS 공용) | `shared` |
+| `androidApp/` | Android 진입점 | `composeApp` |
+| `iosApp/` | iOS 진입점 (Xcode). `ComposeApp` 프레임워크를 사용 | `composeApp` |
+
+- 인프라: `docker-compose.yml` (로컬 개발용). 현재 PostgreSQL 18만 있고, **DB는 잠정 선택**이라 1단계 결정 게이트에서 확정한다.
+- 새 인프라(Redis, 메시지 브로커 등)는 필요해지는 단계에서 결정 게이트를 거쳐 추가한다. 미리 넣지 않는다.
+- Kotlin 버전은 `gradle/libs.versions.toml` 하나로 관리한다. 한 빌드 안의 Kotlin 플러그인은 모두 같은 버전이어야 한다.
+
+### 자주 쓰는 명령
+
+```bash
+docker compose up -d --wait              # 로컬 DB 실행
+./gradlew :server:bootRun                # 서버 실행 (localhost:8080)
+./gradlew :server:test                   # 서버 테스트
+./gradlew :androidApp:assembleDebug      # Android 빌드
+```
 
 ---
 
@@ -19,7 +35,7 @@
 
 | 영역 | 대상 | 방식 |
 |---|---|---|
-| 🔴 High | 인증/보안, DB 스키마·인덱스, 트랜잭션·동시성, WebSocket·메시징, 캐시, 수평 확장(Redis Pub/Sub), 장애 처리, 배포 인프라 | 아래 규칙 1~5 적용 |
+| 🔴 High | 인증/보안, DB 스키마·인덱스, 트랜잭션·동시성, WebSocket·메시징, 캐시, 수평 확장(서버 간 메시지 전달), 장애 처리, 배포 인프라 | 아래 규칙 1~5 적용 |
 | 🟢 Low | Gradle/빌드 설정, 보일러플레이트, KMP/Compose UI, 반복적인 CRUD, 포매팅 | 바로 작성하고 한 줄로 설명 |
 
 애매하면 🔴로 본다. 단 같은 개념이 두 번째로 나오면 🟢로 내린다.
@@ -71,7 +87,7 @@
 로드맵의 한 단계가 끝나면 장애·한계 실험 하나를 제안한다. 예:
 
 - 동시 요청 100개로 안 읽은 수 카운트를 깨뜨려 보기
-- Redis를 내렸을 때 무슨 일이 생기는지 보기
+- DB나 외부 인프라(캐시, 메시지 브로커)를 내렸을 때 무슨 일이 생기는지 보기
 - SQL 로그를 켜고 N+1 쿼리 찾기
 - 서버 2대를 띄워 메시지가 유실되는지 확인하기
 
@@ -128,5 +144,5 @@
 - [ ] 4. 읽음 표시, 안 읽은 수: 동시성, 트랜잭션, 쿼리 최적화
 - [ ] 5. 오프라인 푸시: FCM/APNs, 메시지 큐
 - [ ] 6. 이미지 전송: S3, Presigned URL
-- [ ] 7. 서버 수평 확장: Redis Pub/Sub, 무상태 설계, 로드밸런서
+- [ ] 7. 서버 수평 확장: 서버 간 메시지 전달(Pub/Sub), 무상태 설계, 로드밸런서
 - [ ] 8. 배포와 운영: Docker, CI/CD, 클라우드, 로그·모니터링
