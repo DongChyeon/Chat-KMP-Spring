@@ -3,10 +3,25 @@
 실시간 채팅 서비스. **백엔드 학습이 1차 목적**인 프로젝트.
 오너는 모바일 개발 3년차이고 백엔드는 처음이다.
 
-- `server/`: Spring Boot (Kotlin, Gradle Kotlin DSL)
-- `shared/`: KMP 공통 모듈 (DTO, 메시지 프로토콜). server는 JVM 타깃을 의존
-- `composeApp/`, `iosApp/`: Compose Multiplatform 앱
-- 인프라: PostgreSQL, Redis, Docker
+| 모듈 | 역할 | 의존 |
+|---|---|---|
+| `server/` | Spring Boot 4 (Kotlin, JDK 21) | `shared` (JVM 타깃) |
+| `shared/` | 서버와 앱이 함께 쓰는 순수 Kotlin 코드: DTO, API 경로, 메시지 프로토콜. **UI 의존성 금지** | 없음 |
+| `composeApp/` | Compose Multiplatform UI (Android/iOS 공용) | `shared` |
+| `androidApp/` | Android 진입점 | `composeApp` |
+| `iosApp/` | iOS 진입점 (Xcode). `ComposeApp` 프레임워크를 사용 | `composeApp` |
+
+- 인프라: `docker-compose.yml` (로컬 개발용 PostgreSQL 18, Redis 8)
+- Kotlin 버전은 `gradle/libs.versions.toml` 하나로 관리한다. 한 빌드 안의 Kotlin 플러그인은 모두 같은 버전이어야 한다.
+
+### 자주 쓰는 명령
+
+```bash
+docker compose up -d --wait              # PostgreSQL, Redis 실행
+./gradlew :server:bootRun                # 서버 실행 (localhost:8080)
+./gradlew :server:test                   # 서버 테스트
+./gradlew :androidApp:assembleDebug      # Android 빌드
+```
 
 ---
 
