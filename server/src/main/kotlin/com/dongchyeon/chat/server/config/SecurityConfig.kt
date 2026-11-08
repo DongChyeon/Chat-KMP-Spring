@@ -1,5 +1,8 @@
 package com.dongchyeon.chat.server.config
 
+import com.dongchyeon.chat.server.auth.JwtAuthenticationEntryPoint
+import com.dongchyeon.chat.server.auth.JwtAuthenticationFilter
+import com.dongchyeon.chat.server.auth.JwtProvider
 import com.dongchyeon.chat.shared.ApiPaths
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -9,10 +12,13 @@ import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.crypto.factory.PasswordEncoderFactories
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 
-// 5번(인증 필터)에서 JWT 필터를 추가하면서 다시 다룬다
 @Configuration
-class SecurityConfig {
+class SecurityConfig(
+    private val jwtProvider: JwtProvider,
+    private val entryPoint: JwtAuthenticationEntryPoint,
+) {
 
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
@@ -29,6 +35,10 @@ class SecurityConfig {
                 authorize("/error", permitAll)
                 authorize(anyRequest, authenticated)
             }
+            // 등록하지 않으면 기본값 Http403ForbiddenEntryPoint가 403과 Spring 기본 본문을 보낸다 (ADR 0013)
+            exceptionHandling { authenticationEntryPoint = entryPoint }
+            // 아이디/비밀번호 폼 로그인 필터 자리 앞에 끼워 넣는다. 인가 필터보다 먼저 실행되어야 한다
+            addFilterBefore<UsernamePasswordAuthenticationFilter>(JwtAuthenticationFilter(jwtProvider, entryPoint))
         }
         return http.build()
     }
