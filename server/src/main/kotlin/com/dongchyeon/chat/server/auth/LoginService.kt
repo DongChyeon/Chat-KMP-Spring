@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.util.UUID
 
 @Service
 class LoginService(
@@ -17,6 +18,7 @@ class LoginService(
     private val passwordEncoder: PasswordEncoder,
     private val jwtProvider: JwtProvider,
 ) {
+    private val dummyHash = checkNotNull(passwordEncoder.encode(UUID.randomUUID().toString()))
 
     @Transactional
     fun login(request: LoginRequest): TokenResponse {
@@ -26,11 +28,12 @@ class LoginService(
 
         val user = userRepository.findByEmail(request.email)
 
-        // TODO(learn): 타이밍 공격 — 에러 메시지는 하나로 통일했지만 응답 시간으로 계정 존재 여부가 샌다.
-        //  이메일이 없으면 BCrypt 비교 없이 바로 실패해서 빠르고, 있으면 BCrypt 비교를 하느라 느리다.
-        //  ./scripts/login-timing.sh 로 두 경우의 평균 응답 시간을 재 보고, 차이가 없어지도록 고쳐 보자.
-        //  힌트: 이메일이 없을 때도 BCrypt 비교를 한 번 하게 만들 수 있을까? 무엇과 비교하면 될까?
-        if (user == null || !passwordEncoder.matches(request.password, user.password)) {
+        // 이메일이 없더라도 BCrypt 연산을 수행하여 비밀번호가 틀렸을 때와 실행 시간을 비슷하게 한다
+        if (user == null) {
+            passwordEncoder.matches(request.password, dummyHash)
+            throw invalidCredentials()
+        }
+        if (!passwordEncoder.matches(request.password, user.password)) {
             throw invalidCredentials()
         }
 
