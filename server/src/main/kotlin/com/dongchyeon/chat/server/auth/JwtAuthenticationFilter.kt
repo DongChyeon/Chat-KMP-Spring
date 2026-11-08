@@ -1,5 +1,9 @@
 package com.dongchyeon.chat.server.auth
 
+import com.dongchyeon.chat.server.auth.JwtProvider.Companion.TYPE_CLAIM
+import com.dongchyeon.chat.shared.error.ErrorCode
+import io.jsonwebtoken.ExpiredJwtException
+import io.jsonwebtoken.JwtException
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -48,13 +52,21 @@ class JwtAuthenticationFilter(
      * 실패하면 JwtAuthenticationException(ErrorCode.TOKEN_EXPIRED 또는 ErrorCode.INVALID_TOKEN, 메시지)를 던진다.
      */
     private fun authenticate(token: String): Long {
-        // TODO(learn) 1: jwtProvider.parse()가 던지는 예외를 "만료"와 "그 외(위조, 형식 오류)"로 나눠
-        //   각각 TOKEN_EXPIRED / INVALID_TOKEN의 JwtAuthenticationException으로 바꾸기
-        //   힌트: jjwt 예외 계층(io.jsonwebtoken.ExpiredJwtException, io.jsonwebtoken.JwtException). 두 예외는 부모-자식 관계다. catch 순서가 결과를 바꾼다
-        val claims = jwtProvider.parse(token)
+        val claims = try {
+            jwtProvider.parse(token)
+        } catch (e: ExpiredJwtException) {
+            // ExpiredJwtException은 JwtException의 자식이라 반드시 먼저 잡는다. 순서를 바꾸면 만료도 INVALID_TOKEN이 된다
+            throw JwtAuthenticationException(ErrorCode.TOKEN_EXPIRED, "토큰이 만료되었습니다.", e)
+        } catch (e: JwtException) {
+            // 형식 오류(Malformed), 서명 불일치(Signature) 등 나머지를 부모 하나로 받는다
+            throw JwtAuthenticationException(ErrorCode.INVALID_TOKEN, "유효하지 않은 토큰입니다.", e)
+        }
 
-        // TODO(learn) 2: Refresh Token을 Access Token 자리에 넣은 요청을 INVALID_TOKEN으로 거부하기
-        //   힌트: ADR 0012 결과 칸, JwtProvider.TYPE_CLAIM, TokenType
+        // ADR 0012: 두 토큰이 같은 키로 서명되므로 종류를 확인한다.
+        // "REFRESH가 아니면 통과"가 아니라 "ACCESS일 때만 통과"로 써서 type 칸이 없는 토큰도 거부한다
+        if (claims[TYPE_CLAIM] != TokenType.ACCESS.name) {
+            throw JwtAuthenticationException(ErrorCode.INVALID_TOKEN, "유효하지 않은 토큰입니다.")
+        }
 
         return claims.subject.toLong()
     }
