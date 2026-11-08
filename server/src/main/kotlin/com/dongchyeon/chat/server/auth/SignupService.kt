@@ -10,12 +10,16 @@ import org.springframework.http.HttpStatus
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.slf4j.LoggerFactory
+import org.springframework.dao.DataIntegrityViolationException
 
 @Service
 class SignupService(
     private val userRepository: UserRepository,
     private val passwordEncoder: PasswordEncoder,
 ) {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     @Transactional
     fun signup(request: SignupRequest): User {
@@ -34,11 +38,12 @@ class SignupService(
             nickname = request.nickname,
         )
 
-        // TODO(learn): 2차 방어 — 동시 가입 요청 두 개가 위의 existsByEmail 확인을 둘 다 통과하면,
-        //  아래 save()에서 DB의 UNIQUE 제약 위반이 난다. 지금은 이 예외가 그대로 올라가 500(INTERNAL_ERROR)으로 응답된다.
-        //  이 경우에도 409(DUPLICATE_EMAIL)로 응답하도록 바꿔 보자.
-        //  힌트 1: 어떤 예외가 올라오는지 먼저 확인한다 (DataIntegrityViolationException)
-        //  힌트 2: save()를 호출하는 순간 INSERT가 바로 나갈까, 트랜잭션이 끝날 때 나갈까? ID 생성 전략(IDENTITY)과 관련 있다
-        return userRepository.save(user)
+
+        // 2차 방어: 동시 가입 요청 두 개가 위의 existsByEmail 확인을 둘 다 통과하는 경우를 거른다
+        return try {
+            userRepository.save(user)
+        } catch (e: DataIntegrityViolationException) {
+            throw ApiException(HttpStatus.CONFLICT, ErrorCode.DUPLICATE_EMAIL, "이미 가입된 이메일입니다.")
+        }
     }
 }
