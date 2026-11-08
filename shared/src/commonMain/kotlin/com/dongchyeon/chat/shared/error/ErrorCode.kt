@@ -16,4 +16,7 @@ enum class ErrorCode {
     INVALID_PASSWORD,
     INVALID_NICKNAME,
     DUPLICATE_EMAIL,
+
+    // 로그인: 이메일이 없는 경우와 비밀번호가 틀린 경우를 구분하지 않는다 (계정 열거 방지)
+    INVALID_CREDENTIALS,
 }

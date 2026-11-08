@@ -23,6 +23,7 @@ class SecurityConfig {
             sessionManagement { sessionCreationPolicy = SessionCreationPolicy.STATELESS }
             authorizeHttpRequests {
                 authorize(ApiPaths.SIGNUP, permitAll)
+                authorize(ApiPaths.LOGIN, permitAll)
                 authorize(ApiPaths.INFO, permitAll)
                 authorize("/actuator/health", permitAll)
                 authorize("/error", permitAll)
