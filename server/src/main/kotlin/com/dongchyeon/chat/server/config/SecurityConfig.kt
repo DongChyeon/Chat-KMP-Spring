@@ -30,6 +30,7 @@ class SecurityConfig(
             authorizeHttpRequests {
                 authorize(ApiPaths.SIGNUP, permitAll)
                 authorize(ApiPaths.LOGIN, permitAll)
+                authorize(ApiPaths.REFRESH, permitAll)
                 authorize(ApiPaths.INFO, permitAll)
                 authorize("/actuator/health", permitAll)
                 authorize("/error", permitAll)

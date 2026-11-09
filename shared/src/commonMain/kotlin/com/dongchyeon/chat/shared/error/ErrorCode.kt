@@ -24,4 +24,7 @@ enum class ErrorCode {
     UNAUTHORIZED, // 보호된 경로에 토큰 없이 요청 → 로그인 화면으로
     TOKEN_EXPIRED, // Access Token 만료 → Refresh Token으로 재발급 시도
     INVALID_TOKEN, // 위조, 형식 오류, 종류가 다른 토큰 → 로그아웃
+
+    // 토큰 재발급: 원인(만료, 폐기, 위조)을 나누지 않는다. 앱은 받으면 로그인 화면으로 (ADR 0014)
+    REFRESH_FAILED,
 }

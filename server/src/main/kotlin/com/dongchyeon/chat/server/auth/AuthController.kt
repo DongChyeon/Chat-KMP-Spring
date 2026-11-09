@@ -2,6 +2,7 @@ package com.dongchyeon.chat.server.auth
 
 import com.dongchyeon.chat.shared.ApiPaths
 import com.dongchyeon.chat.shared.auth.LoginRequest
+import com.dongchyeon.chat.shared.auth.RefreshRequest
 import com.dongchyeon.chat.shared.auth.SignupRequest
 import com.dongchyeon.chat.shared.auth.TokenResponse
 import com.dongchyeon.chat.shared.auth.UserResponse
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController
 class AuthController(
     private val signupService: SignupService,
     private val loginService: LoginService,
+    private val refreshService: RefreshService,
 ) {
 
     @PostMapping(ApiPaths.SIGNUP)
@@ -26,4 +28,7 @@ class AuthController(
 
     @PostMapping(ApiPaths.LOGIN)
     fun login(@RequestBody request: LoginRequest): TokenResponse = loginService.login(request)
+
+    @PostMapping(ApiPaths.REFRESH)
+    fun refresh(@RequestBody request: RefreshRequest): TokenResponse = refreshService.refresh(request)
 }
