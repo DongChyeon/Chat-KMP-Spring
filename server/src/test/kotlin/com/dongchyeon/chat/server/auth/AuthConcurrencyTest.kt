@@ -18,6 +18,9 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import kotlin.test.assertEquals
 
 // 실제 포트로 띄워 요청마다 Tomcat 스레드에서 처리되게 한다.
@@ -53,10 +56,24 @@ class AuthConcurrencyTest(
         assertEquals(401, post(ApiPaths.REFRESH, RefreshRequest(tokens.refreshToken)).statusCode())
     }
 
-    // TODO(learn): task를 threads개 스레드에서 "최대한 같은 순간에" 실행하고 결과를 모아 돌려주기
-    //  힌트: ExecutorService, CountDownLatch(출발 신호), Future.get()
-    //  힌트: 스레드를 만들자마자 task를 실행하면, 앞 스레드가 끝난 뒤에야 뒤 스레드가 시작될 수 있다
-    private fun <T> runConcurrently(threads: Int, task: () -> T): List<T> = TODO("learn")
+    // 모든 작업이 출발 신호(gate)를 기다리다가 동시에 task를 실행한다
+    private fun <T> runConcurrently(threads: Int, task: () -> T): List<T> {
+        val threadPool = Executors.newFixedThreadPool(threads)
+        try {
+            val gate = CountDownLatch(1)
+
+            val futures: List<Future<T>> = (1..threads).map {
+                threadPool.submit<T> { 
+                    gate.await()
+                    task()
+                }
+            }
+            gate.countDown()
+            return futures.map { it.get() }
+        } finally {
+            threadPool.shutdown()
+        }
+    }
 
     private inline fun <reified T> post(path: String, body: T, accessToken: String? = null): HttpResponse<String> {
         val request = HttpRequest.newBuilder(URI.create("http://localhost:$port$path"))
