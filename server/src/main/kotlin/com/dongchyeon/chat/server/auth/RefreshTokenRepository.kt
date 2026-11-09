@@ -1,11 +1,14 @@
 package com.dongchyeon.chat.server.auth
 
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
+import org.springframework.data.jpa.repository.Query
 
 interface RefreshTokenRepository : JpaRepository<RefreshToken, Long> {
     fun findByTokenHash(tokenHash: String): RefreshToken?
     fun findByUserIdAndDeviceId(userId: Long, deviceId: String): RefreshToken?
-    // TODO(learn): 벌크 DELETE로 바꾸기 (ADR 0017). LogoutService의 호출부도 함께 맞춘다
-    //  힌트: @Modifying, @Query(JPQL은 테이블이 아닌 엔티티·필드 이름을 쓴다), 반환 타입은 삭제된 행 수
+    // ADR 0017: 엔티티를 불러오지 않고 한 문장으로 지운다. 동시 요청이면 늦은 쪽은 0행 삭제로 끝난다
+    @Modifying
+    @Query("delete from RefreshToken r where r.user.id = :userId and r.deviceId = :deviceId")
     fun deleteByUserIdAndDeviceId(userId: Long, deviceId: String): Long
 }
