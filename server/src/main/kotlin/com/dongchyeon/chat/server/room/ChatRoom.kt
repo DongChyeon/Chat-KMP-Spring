@@ -1,5 +1,6 @@
 package com.dongchyeon.chat.server.room
 
+import com.dongchyeon.chat.server.user.User
 import com.dongchyeon.chat.shared.room.RoomType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
@@ -34,4 +35,7 @@ class ChatRoom(
     // 연관관계의 주인은 ChatRoomMember.room이다. 이 컬렉션은 읽기용이고, 참여는 ChatRoomMember를 저장해서 한다
     @OneToMany(mappedBy = "room")
     val members: MutableList<ChatRoomMember> = mutableListOf()
+
+    // 참여 행을 만들면서 members에도 넣는다. 리포지토리로 저장만 하면 이 트랜잭션 안의 members는 비어 있다
+    fun addMember(user: User): ChatRoomMember = ChatRoomMember(room = this, user = user).also { members.add(it) }
 }
