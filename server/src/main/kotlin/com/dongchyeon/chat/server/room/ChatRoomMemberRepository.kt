@@ -15,4 +15,6 @@ interface ChatRoomMemberRepository : JpaRepository<ChatRoomMember, Long> {
         """,
     )
     fun findSharedRoom(userId: Long, otherUserId: Long, type: RoomType): ChatRoom?
+
+    fun existsByRoomIdAndUserId(roomId: Long, userId: Long): Boolean
 }
