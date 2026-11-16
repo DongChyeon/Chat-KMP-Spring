@@ -55,6 +55,19 @@ class GroupRoomTest(
         api.assertError(api.join(owner, roomId), 409, ErrorCode.ALREADY_JOINED)
     }
 
+    // ADR 0026: 나갔던 방에 다시 들어오면 기존 행의 left_at을 비우고 200
+    @Test
+    fun `나갔던 그룹 방에 다시 참여하면 200`() {
+        val owner = api.newUser()
+        val guest = api.newUser()
+        val roomId = Json.decodeFromString<RoomResponse>(api.createGroup(owner, "스터디").body()).id
+        api.join(guest, roomId)
+        assertEquals(204, api.leave(guest, roomId).statusCode())
+
+        val rejoined = api.join(guest, roomId)
+        assertEquals(200, rejoined.statusCode(), rejoined.body())
+    }
+
     @Test
     fun `1대1 방에는 참여할 수 없고, 없는 방은 404`() {
         val a = api.newUser()

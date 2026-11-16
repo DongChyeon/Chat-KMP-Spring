@@ -42,6 +42,13 @@ class ChatRoomController(
         @AuthenticationPrincipal userId: Long,
         @PathVariable roomId: Long,
     ): RoomResponse = chatRoomService.join(userId, roomId).toResponse()
+
+    @PostMapping(ApiPaths.ROOM_LEAVE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun leave(
+        @AuthenticationPrincipal userId: Long,
+        @PathVariable roomId: Long,
+    ) = chatRoomService.leave(userId, roomId)
 }
 
 fun ChatRoom.toResponse() = RoomResponse(

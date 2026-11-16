@@ -38,4 +38,16 @@ class ChatRoomMember(
 
     @Column(nullable = false, updatable = false)
     val joinedAt: Instant = Instant.now()
+
+    // ADR 0026: 나가도 행을 지우지 않고 나간 시각을 남긴다. null이면 참여 중이다
+    var leftAt: Instant? = null
+        protected set
+
+    fun leave() {
+        leftAt = Instant.now()
+    }
+
+    fun rejoin() {
+        leftAt = null
+    }
 }

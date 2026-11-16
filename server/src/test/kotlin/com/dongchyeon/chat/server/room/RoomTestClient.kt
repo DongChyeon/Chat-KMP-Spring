@@ -38,6 +38,8 @@ class RoomTestClient(private val port: Int) {
 
     fun join(user: TestUser, roomId: Long) = send(ApiPaths.roomJoin(roomId), "", user.accessToken)
 
+    fun leave(user: TestUser, roomId: Long) = send(ApiPaths.roomLeave(roomId), "", user.accessToken)
+
     fun assertError(response: HttpResponse<String>, status: Int, code: ErrorCode) {
         assertEquals(status, response.statusCode(), response.body())
         assertEquals(code, Json.decodeFromString<ErrorResponse>(response.body()).code)

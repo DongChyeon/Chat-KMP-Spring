@@ -62,10 +62,19 @@ class ChatRoomService(
         if (room.type == RoomType.DIRECT) {
             throw ApiException(HttpStatus.FORBIDDEN, ErrorCode.DIRECT_ROOM_NOT_JOINABLE, "1:1 방에는 참여할 수 없습니다.")
         }
-        // 1차 방어: 대부분의 중복 참여는 여기서 걸러진다
-        if (chatRoomMemberRepository.existsByRoomIdAndUserId(roomId, userId)) {
-            throw alreadyJoined()
+
+        val member = chatRoomMemberRepository.findByRoomIdAndUserId(roomId, userId)
+        if (member != null) {
+            val isUserLeft = member.leftAt != null
+            if (isUserLeft) {
+                member.rejoin()
+                return room
+            } else {
+                // 1차 방어: 대부분의 중복 참여는 여기서 걸러진다
+                throw alreadyJoined()
+            }
         }
+
         val user = findUser(userId)
         // 2차 방어: 동시 요청이 둘 다 위 확인을 통과하면 (user_id, room_id) unique 제약이 거른다.
         // 예외 뒤에 쿼리를 더 실행하지 않는다. PostgreSQL은 실패한 트랜잭션의 다음 쿼리를 거부한다
@@ -75,6 +84,14 @@ class ChatRoomService(
             throw alreadyJoined()
         }
         return room
+    }
+
+    // ADR 0026: 1:1 방, 그룹 방 모두 나갈 수 있다. 참여 행에 나간 시각만 남긴다
+    @Transactional
+    fun leave(userId: Long, roomId: Long) {
+        val member = chatRoomMemberRepository.findByRoomIdAndUserIdAndLeftAtIsNull(roomId, userId)
+            ?: throw ApiException(HttpStatus.NOT_FOUND, ErrorCode.NOT_FOUND, "참여 중인 방이 아닙니다.")
+        member.leave()
     }
 
     private fun findUser(userId: Long) = userRepository.findByIdOrNull(userId)
