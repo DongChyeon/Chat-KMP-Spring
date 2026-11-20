@@ -109,6 +109,10 @@ class ChatRoomService(
         member.leave()
     }
 
+    // ADR 0028: 응답용 참여자 목록. ChatRoom.members는 나간 사람까지 담으므로 쓰지 않는다
+    @Transactional(readOnly = true)
+    fun activeMembers(roomId: Long): List<ChatRoomMember> = chatRoomMemberRepository.findActiveMembers(roomId)
+
     private fun findUser(userId: Long) = userRepository.findByIdOrNull(userId)
         ?: throw ApiException(HttpStatus.NOT_FOUND, ErrorCode.NOT_FOUND, "유저를 찾지 못했습니다.")
 

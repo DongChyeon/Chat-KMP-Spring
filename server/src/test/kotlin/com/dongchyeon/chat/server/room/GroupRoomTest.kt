@@ -69,6 +69,21 @@ class GroupRoomTest(
         assertEquals(200, rejoined.statusCode(), rejoined.body())
     }
 
+    // ADR 0026: 참여자 응답에는 left_at is null인 사람만 담는다
+    @Test
+    fun `나간 사람은 참여자 목록에 보이지 않는다`() {
+        val owner = api.newUser()
+        val guest = api.newUser()
+        val third = api.newUser()
+        val roomId = Json.decodeFromString<RoomResponse>(api.createGroup(owner, "스터디").body()).id
+        api.join(guest, roomId)
+        api.leave(guest, roomId)
+
+        val joined = api.join(third, roomId)
+        assertEquals(200, joined.statusCode(), joined.body())
+        assertEquals(setOf(owner.id, third.id), Json.decodeFromString<RoomResponse>(joined.body()).members.map { it.userId }.toSet())
+    }
+
     @Test
     fun `1대1 방에는 참여할 수 없고, 없는 방은 404`() {
         val a = api.newUser()

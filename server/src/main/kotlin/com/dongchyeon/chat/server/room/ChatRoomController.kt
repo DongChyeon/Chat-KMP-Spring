@@ -27,7 +27,7 @@ class ChatRoomController(
     ): ResponseEntity<RoomResponse> {
         val result = chatRoomService.createDirect(userId, request.targetUserId)
         val status = if (result.created) HttpStatus.CREATED else HttpStatus.OK
-        return ResponseEntity.status(status).body(result.room.toResponse())
+        return ResponseEntity.status(status).body(result.room.withActiveMembers())
     }
 
     @PostMapping(ApiPaths.GROUP_ROOMS)
@@ -35,13 +35,13 @@ class ChatRoomController(
     fun createGroup(
         @AuthenticationPrincipal userId: Long,
         @RequestBody request: CreateGroupRoomRequest,
-    ): RoomResponse = chatRoomService.createGroup(userId, request.name).toResponse()
+    ): RoomResponse = chatRoomService.createGroup(userId, request.name).withActiveMembers()
 
     @PostMapping(ApiPaths.ROOM_JOIN)
     fun join(
         @AuthenticationPrincipal userId: Long,
         @PathVariable roomId: Long,
-    ): RoomResponse = chatRoomService.join(userId, roomId).toResponse()
+    ): RoomResponse = chatRoomService.join(userId, roomId).withActiveMembers()
 
     @PostMapping(ApiPaths.ROOM_LEAVE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -49,9 +49,13 @@ class ChatRoomController(
         @AuthenticationPrincipal userId: Long,
         @PathVariable roomId: Long,
     ) = chatRoomService.leave(userId, roomId)
+
+    // ADR 0028: 참여자는 ChatRoom.members(나간 사람 포함)가 아니라 참여 중인 사람만 조회해서 담는다
+    private fun ChatRoom.withActiveMembers(): RoomResponse =
+        toResponse(chatRoomService.activeMembers(checkNotNull(id)))
 }
 
-fun ChatRoom.toResponse() = RoomResponse(
+fun ChatRoom.toResponse(members: List<ChatRoomMember>) = RoomResponse(
     id = checkNotNull(id),
     type = type,
     name = name,

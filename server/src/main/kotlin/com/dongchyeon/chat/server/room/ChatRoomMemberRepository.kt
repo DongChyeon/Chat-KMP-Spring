@@ -19,4 +19,16 @@ interface ChatRoomMemberRepository : JpaRepository<ChatRoomMember, Long> {
     fun findByRoomIdAndUserIdAndLeftAtIsNull(roomId: Long, userId: Long): ChatRoomMember?
 
     fun findByRoomIdAndUserId(roomId: Long, userId: Long): ChatRoomMember?
+
+    // ADR 0028: 참여 중인 참여자만, 들어온 순서대로.
+    // fetch join으로 사용자까지 이 쿼리에서 채운다. 일반 join이면 m.user가 프록시로 남아 참여자마다 users 조회가 나간다(N+1)
+    @Query(
+        """
+        select m from ChatRoomMember m
+        join fetch m.user
+        where m.room.id = :roomId and m.leftAt is null
+        order by m.id
+        """,
+    )
+    fun findActiveMembers(roomId: Long): List<ChatRoomMember>
 }
