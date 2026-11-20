@@ -18,7 +18,7 @@ class ChatRoomService(
     private val chatRoomMemberRepository: ChatRoomMemberRepository,
 ) {
 
-    // ADR 0022: 이미 방이 있으면 그 방을 돌려준다(created = false)
+    // ADR 0022: 이미 방이 있으면 그 방을 돌려준다(created = false). 나갔던 방이어도 같은 방을 돌려준다 (ADR 0026)
     @Transactional
     fun createDirect(userId: Long, targetUserId: Long): DirectRoomResult {
         if (userId == targetUserId) {
@@ -33,6 +33,21 @@ class ChatRoomService(
         val room = chatRoomMemberRepository.findSharedRoom(userId, targetUserId, RoomType.DIRECT)
 
         if (room != null) {
+            // ADR 0026: 나갔던 쪽(요청한 사람, 상대, 또는 둘 다)의 참여 행을 되살린다.
+            // 위에서 두 사용자 행을 잠갔으므로 같은 두 사람의 요청은 하나씩 처리된다 (ADR 0027과 달리 중복 전이가 없다)
+            val roomId = checkNotNull(room.id) { "저장된 채팅방에 id가 없습니다" }
+
+            // findSharedRoom은 두 사람의 참여 행을 조인해서 찾으므로 두 행은 반드시 있다. 없으면 데이터가 깨진 것이다
+            val member = checkNotNull(chatRoomMemberRepository.findByRoomIdAndUserId(roomId, userId)) {
+                "1:1 방에 요청한 사람의 참여 행이 없습니다: roomId=$roomId, userId=$userId"
+            }
+            val targetMember = checkNotNull(chatRoomMemberRepository.findByRoomIdAndUserId(roomId, targetUserId)) {
+                "1:1 방에 상대의 참여 행이 없습니다: roomId=$roomId, userId=$targetUserId"
+            }
+
+            if (member.leftAt != null) member.rejoin()
+            if (targetMember.leftAt != null) targetMember.rejoin()
+
             return DirectRoomResult(room, false)
         } else {
             val chatRoom = ChatRoom(type = RoomType.DIRECT, name = null)

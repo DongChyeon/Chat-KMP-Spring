@@ -65,6 +65,23 @@ class DirectRoomTest(
         assertEquals(1, responses.map { Json.decodeFromString<RoomResponse>(it.body()).id }.toSet().size)
     }
 
+    // ADR 0026: 나갔던 1:1 방을 다시 만들면 기존 방을 돌려주고 나갔던 쪽을 다시 참여시킨다
+    @Test
+    fun `나갔던 1대1 방을 다시 만들면 같은 방에 다시 참여한다`() {
+        val a = api.newUser()
+        val b = api.newUser()
+        val roomId = Json.decodeFromString<RoomResponse>(api.createDirect(a, b.id).body()).id
+        assertEquals(204, api.leave(a, roomId).statusCode())
+
+        val again = api.createDirect(a, b.id)
+        assertEquals(200, again.statusCode(), again.body())
+        assertEquals(roomId, Json.decodeFromString<RoomResponse>(again.body()).id)
+
+        // 참여 중이어야 다시 나갈 수 있다. 참여 중이 아니면 404
+        val leaveAgain = api.leave(a, roomId)
+        assertEquals(204, leaveAgain.statusCode(), leaveAgain.body())
+    }
+
     companion object {
         private const val THREADS = 10
     }
