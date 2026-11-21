@@ -2,10 +2,13 @@ package com.dongchyeon.chat.server.room
 
 import com.dongchyeon.chat.server.common.ApiException
 import com.dongchyeon.chat.server.user.UserRepository
+import com.dongchyeon.chat.shared.CursorPage
 import com.dongchyeon.chat.shared.error.ErrorCode
 import com.dongchyeon.chat.shared.room.RoomRules
+import com.dongchyeon.chat.shared.room.RoomSummaryResponse
 import com.dongchyeon.chat.shared.room.RoomType
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.data.domain.Limit
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -112,6 +115,47 @@ class ChatRoomService(
     // ADR 0028: 응답용 참여자 목록. ChatRoom.members는 나간 사람까지 담으므로 쓰지 않는다
     @Transactional(readOnly = true)
     fun activeMembers(roomId: Long): List<ChatRoomMember> = chatRoomMemberRepository.findActiveMembers(roomId)
+
+    // 내 채팅방 목록 (ADR 0023, 0024, 0029). 쿼리는 목록 1번 + 1:1 방 상대 닉네임 1번
+    @Transactional(readOnly = true)
+    fun myRooms(userId: Long, cursor: String?, size: Int): CursorPage<RoomSummaryResponse> {
+        if (size !in 1..RoomRules.PAGE_SIZE_MAX) {
+            throw ApiException(HttpStatus.BAD_REQUEST, ErrorCode.INVALID_REQUEST, "size는 1~${RoomRules.PAGE_SIZE_MAX}이어야 합니다.")
+        }
+        val cursorId = cursor?.let { RoomCursor.decode(it) } ?: Long.MAX_VALUE
+
+        // 다음 페이지가 있는지 알기 위해 하나 더 가져온다 (ADR 0024)
+        val fetched = chatRoomMemberRepository.findMyRooms(userId, cursorId, Limit.of(size + 1))
+
+        // size보다 많이 왔으면 다음 페이지가 있다. 더 가져온 1개는 응답에서 뺀다
+        val hasNext = fetched.size > size
+        val rooms = fetched.take(size)
+
+        // 커서에는 응답에 담긴 마지막 방을 넣는다. 잘라 낸 방을 넣으면 다음 페이지의 `id < 커서`에 걸려 그 방이 빠진다
+        val nextCursor = if (hasNext) {
+            RoomCursor.encode(checkNotNull(rooms.last().id) { "저장된 채팅방에 id가 없습니다" })
+        } else {
+            null
+        }
+
+        val partners = directPartnerNames(rooms, userId)
+        return CursorPage(items = rooms.map { it.toSummary(partners) }, nextCursor = nextCursor)
+    }
+
+    private fun directPartnerNames(rooms: List<ChatRoom>, userId: Long): Map<Long, String> {
+        val directRoomIds = rooms.filter { it.type == RoomType.DIRECT }.map { checkNotNull(it.id) }
+        if (directRoomIds.isEmpty()) return emptyMap()
+        return chatRoomMemberRepository.findDirectPartners(directRoomIds, userId).associate { it.roomId to it.nickname }
+    }
+
+    private fun ChatRoom.toSummary(partners: Map<Long, String>): RoomSummaryResponse {
+        val roomId = checkNotNull(id)
+        val title = when (type) {
+            RoomType.GROUP -> checkNotNull(name) { "그룹 방에 이름이 없습니다: roomId=$roomId" }
+            RoomType.DIRECT -> checkNotNull(partners[roomId]) { "1:1 방에 상대의 참여 행이 없습니다: roomId=$roomId" }
+        }
+        return RoomSummaryResponse(id = roomId, type = type, title = title)
+    }
 
     private fun findUser(userId: Long) = userRepository.findByIdOrNull(userId)
         ?: throw ApiException(HttpStatus.NOT_FOUND, ErrorCode.NOT_FOUND, "유저를 찾지 못했습니다.")

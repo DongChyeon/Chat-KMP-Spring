@@ -1,16 +1,21 @@
 package com.dongchyeon.chat.server.room
 
 import com.dongchyeon.chat.shared.ApiPaths
+import com.dongchyeon.chat.shared.CursorPage
 import com.dongchyeon.chat.shared.room.CreateDirectRoomRequest
 import com.dongchyeon.chat.shared.room.CreateGroupRoomRequest
 import com.dongchyeon.chat.shared.room.RoomMemberResponse
 import com.dongchyeon.chat.shared.room.RoomResponse
+import com.dongchyeon.chat.shared.room.RoomRules
+import com.dongchyeon.chat.shared.room.RoomSummaryResponse
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
@@ -42,6 +47,14 @@ class ChatRoomController(
         @AuthenticationPrincipal userId: Long,
         @PathVariable roomId: Long,
     ): RoomResponse = chatRoomService.join(userId, roomId).withActiveMembers()
+
+    // 첫 페이지는 cursor를 생략한다 (ADR 0024)
+    @GetMapping(ApiPaths.MY_ROOMS)
+    fun myRooms(
+        @AuthenticationPrincipal userId: Long,
+        @RequestParam(required = false) cursor: String?,
+        @RequestParam(required = false) size: Int?,
+    ): CursorPage<RoomSummaryResponse> = chatRoomService.myRooms(userId, cursor, size ?: RoomRules.PAGE_SIZE_DEFAULT)
 
     @PostMapping(ApiPaths.ROOM_LEAVE)
     @ResponseStatus(HttpStatus.NO_CONTENT)

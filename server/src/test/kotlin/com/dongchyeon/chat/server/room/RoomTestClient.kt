@@ -11,6 +11,7 @@ import com.dongchyeon.chat.shared.room.CreateDirectRoomRequest
 import com.dongchyeon.chat.shared.room.CreateGroupRoomRequest
 import kotlinx.serialization.json.Json
 import java.net.URI
+import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
@@ -23,9 +24,9 @@ data class TestUser(val id: Long, val accessToken: String)
 class RoomTestClient(private val port: Int) {
     private val client = HttpClient.newHttpClient()
 
-    fun newUser(): TestUser {
+    fun newUser(nickname: String = "tester"): TestUser {
         val email = "room-${UUID.randomUUID()}@test.com"
-        val user = Json.decodeFromString<UserResponse>(post(ApiPaths.SIGNUP, SignupRequest(email, PASSWORD, "tester")).body())
+        val user = Json.decodeFromString<UserResponse>(post(ApiPaths.SIGNUP, SignupRequest(email, PASSWORD, nickname)).body())
         val tokens = Json.decodeFromString<TokenResponse>(post(ApiPaths.LOGIN, LoginRequest(email, PASSWORD, "phone")).body())
         return TestUser(user.id, tokens.accessToken)
     }
@@ -39,6 +40,19 @@ class RoomTestClient(private val port: Int) {
     fun join(user: TestUser, roomId: Long) = send(ApiPaths.roomJoin(roomId), "", user.accessToken)
 
     fun leave(user: TestUser, roomId: Long) = send(ApiPaths.roomLeave(roomId), "", user.accessToken)
+
+    fun myRooms(user: TestUser, cursor: String? = null, size: Int? = null): HttpResponse<String> {
+        val query = listOfNotNull(
+            cursor?.let { "cursor=${URLEncoder.encode(it, Charsets.UTF_8)}" },
+            size?.let { "size=$it" },
+        ).joinToString("&")
+        val path = if (query.isEmpty()) ApiPaths.MY_ROOMS else "${ApiPaths.MY_ROOMS}?$query"
+        val request = HttpRequest.newBuilder(URI.create("http://localhost:$port$path"))
+            .header("Authorization", "Bearer ${user.accessToken}")
+            .GET()
+            .build()
+        return client.send(request, HttpResponse.BodyHandlers.ofString())
+    }
 
     fun assertError(response: HttpResponse<String>, status: Int, code: ErrorCode) {
         assertEquals(status, response.statusCode(), response.body())

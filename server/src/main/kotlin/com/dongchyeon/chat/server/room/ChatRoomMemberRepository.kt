@@ -1,6 +1,7 @@
 package com.dongchyeon.chat.server.room
 
 import com.dongchyeon.chat.shared.room.RoomType
+import org.springframework.data.domain.Limit
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 
@@ -31,4 +32,27 @@ interface ChatRoomMemberRepository : JpaRepository<ChatRoomMember, Long> {
         """,
     )
     fun findActiveMembers(roomId: Long): List<ChatRoomMember>
+
+    // 내 채팅방 목록 한 페이지 (ADR 0023, 0024). 첫 페이지는 cursorId에 Long.MAX_VALUE가 들어온다.
+    // 정렬 기준과 커서 기준은 같은 컬럼(room_id)이어야 페이지 사이에 빠지거나 겹치는 방이 없다.
+    // 나간 방은 빼고(ADR 0026), 개수는 limit 파라미터로 Spring Data가 붙인다(fetch first ? rows only)
+    @Query(
+        """
+        select m.room from ChatRoomMember m
+        where m.user.id = :userId and m.room.id < :cursorId and m.leftAt is null
+        order by m.room.id desc
+        """,
+    )
+    fun findMyRooms(userId: Long, cursorId: Long, limit: Limit): List<ChatRoom>
+
+    // 1:1 방들의 상대 닉네임을 한 번에 (ADR 0029).
+    // 상대가 나갔어도 그 방은 여전히 "그 사람과의 방"이므로 left_at은 보지 않는다
+    @Query(
+        """
+        select new com.dongchyeon.chat.server.room.DirectPartner(m.room.id, u.nickname)
+        from ChatRoomMember m join m.user u
+        where m.room.id in :roomIds and m.user.id <> :userId
+        """,
+    )
+    fun findDirectPartners(roomIds: Collection<Long>, userId: Long): List<DirectPartner>
 }
