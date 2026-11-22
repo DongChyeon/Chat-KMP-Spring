@@ -27,4 +27,10 @@ enum class ErrorCode {
 
     // 토큰 재발급: 원인(만료, 폐기, 위조)을 나누지 않는다. 앱은 받으면 로그인 화면으로 (ADR 0014)
     REFRESH_FAILED,
+
+    // 채팅방
+    INVALID_ROOM_NAME,
+    INVALID_CURSOR, // 앱이 보낸 커서를 해석할 수 없다 (ADR 0024)
+    ALREADY_JOINED,
+    DIRECT_ROOM_NOT_JOINABLE, // 1:1 방에는 다른 사용자가 참여할 수 없다 (ADR 0019)
 }
