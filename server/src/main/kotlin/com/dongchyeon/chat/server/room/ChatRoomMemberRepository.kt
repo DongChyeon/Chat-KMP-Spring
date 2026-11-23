@@ -1,8 +1,10 @@
 package com.dongchyeon.chat.server.room
 
 import com.dongchyeon.chat.shared.room.RoomType
+import jakarta.persistence.LockModeType
 import org.springframework.data.domain.Limit
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 
 interface ChatRoomMemberRepository : JpaRepository<ChatRoomMember, Long> {
@@ -17,9 +19,13 @@ interface ChatRoomMemberRepository : JpaRepository<ChatRoomMember, Long> {
     )
     fun findSharedRoom(userId: Long, otherUserId: Long, type: RoomType): ChatRoom?
 
-    fun findByRoomIdAndUserIdAndLeftAtIsNull(roomId: Long, userId: Long): ChatRoomMember?
-
     fun findByRoomIdAndUserId(roomId: Long, userId: Long): ChatRoomMember?
+
+    // ADR 0042: 재참여와 퇴장이 정확히 한 번만 성공하도록 참여 행을 잠그고 읽는다
+    // TODO(learn): 이 조회가 다른 트랜잭션이 커밋할 때까지 기다리게 만들기 — 힌트: UserRepository.findAllByIdForUpdate (ADR 0022)
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select m from ChatRoomMember m where m.room.id = :roomId and m.user.id = :userId")
+    fun findByRoomIdAndUserIdForUpdate(roomId: Long, userId: Long): ChatRoomMember?
 
     // ADR 0028: 참여 중인 참여자만, 들어온 순서대로.
     // fetch join으로 사용자까지 이 쿼리에서 채운다. 일반 join이면 m.user가 프록시로 남아 참여자마다 users 조회가 나간다(N+1)

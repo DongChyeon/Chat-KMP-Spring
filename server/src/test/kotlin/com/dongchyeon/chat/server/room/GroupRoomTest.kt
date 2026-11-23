@@ -13,7 +13,6 @@ import org.springframework.boot.test.context.SpringBootTest.WebEnvironment
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.context.annotation.Import
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 // 동시성 테스트가 있으므로 @Transactional(롤백)을 쓰지 않고 테스트마다 새 사용자를 만든다 (ADR 0018)
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
@@ -107,9 +106,9 @@ class GroupRoomTest(
         assertEquals(THREADS - 1, statuses.count { it == 409 }, statuses.toString())
     }
 
-    // ADR 0027: 동시 재참여는 막지 않는다. 200이 하나라는 보장은 없고, 최종 상태(참여 중)만 보장한다
+    // ADR 0042 (ADR 0027 축 2 대체): 입장 메시지가 한 번만 남도록 동시 재참여도 정확히 한 번만 성공한다
     @Test
-    fun `나갔던 사용자가 동시에 여러 번 재참여하면 200이 여러 개일 수 있지만 결국 참여 중이다`() {
+    fun `나갔던 사용자가 동시에 여러 번 재참여해도 성공은 한 번`() {
         val owner = api.newUser()
         val guest = api.newUser()
         val roomId = Json.decodeFromString<RoomResponse>(api.createGroup(owner, "스터디").body()).id
@@ -118,9 +117,22 @@ class GroupRoomTest(
 
         val statuses = runConcurrently(THREADS) { api.join(guest, roomId).statusCode() }
 
-        assertTrue(statuses.all { it == 200 || it == 409 }, statuses.toString())
-        assertTrue(statuses.any { it == 200 }, statuses.toString())
-        api.assertError(api.join(guest, roomId), 409, ErrorCode.ALREADY_JOINED)
+        assertEquals(1, statuses.count { it == 200 }, statuses.toString())
+        assertEquals(THREADS - 1, statuses.count { it == 409 }, statuses.toString())
+    }
+
+    // ADR 0042: 퇴장 메시지가 한 번만 남도록 동시 퇴장도 정확히 한 번만 성공한다
+    @Test
+    fun `같은 사용자가 동시에 여러 번 나가도 성공은 한 번`() {
+        val owner = api.newUser()
+        val guest = api.newUser()
+        val roomId = Json.decodeFromString<RoomResponse>(api.createGroup(owner, "스터디").body()).id
+        api.join(guest, roomId)
+
+        val statuses = runConcurrently(THREADS) { api.leave(guest, roomId).statusCode() }
+
+        assertEquals(1, statuses.count { it == 204 }, statuses.toString())
+        assertEquals(THREADS - 1, statuses.count { it == 404 }, statuses.toString())
     }
 
     companion object {

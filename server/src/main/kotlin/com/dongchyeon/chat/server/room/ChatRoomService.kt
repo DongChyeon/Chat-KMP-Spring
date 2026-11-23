@@ -81,7 +81,8 @@ class ChatRoomService(
             throw ApiException(HttpStatus.FORBIDDEN, ErrorCode.DIRECT_ROOM_NOT_JOINABLE, "1:1 방에는 참여할 수 없습니다.")
         }
 
-        val member = chatRoomMemberRepository.findByRoomIdAndUserId(roomId, userId)
+        // ADR 0042: 동시 재참여 중 하나만 rejoin()에 들어가고, 나머지는 바뀐 left_at을 보고 409로 간다
+        val member = chatRoomMemberRepository.findByRoomIdAndUserIdForUpdate(roomId, userId)
         if (member != null) {
             val isUserLeft = member.leftAt != null
             if (isUserLeft) {
@@ -107,8 +108,11 @@ class ChatRoomService(
     // ADR 0026: 1:1 방, 그룹 방 모두 나갈 수 있다. 참여 행에 나간 시각만 남긴다
     @Transactional
     fun leave(userId: Long, roomId: Long) {
-        val member = chatRoomMemberRepository.findByRoomIdAndUserIdAndLeftAtIsNull(roomId, userId)
-            ?: throw ApiException(HttpStatus.NOT_FOUND, ErrorCode.NOT_FOUND, "참여 중인 방이 아닙니다.")
+        // ADR 0042: 동시 퇴장 중 하나만 leave()에 들어가고, 나머지는 바뀐 left_at을 보고 404로 간다
+        val member = chatRoomMemberRepository.findByRoomIdAndUserIdForUpdate(roomId, userId)
+        if (member == null || member.leftAt != null) {
+            throw ApiException(HttpStatus.NOT_FOUND, ErrorCode.NOT_FOUND, "참여 중인 방이 아닙니다.")
+        }
         member.leave()
     }
 
