@@ -18,6 +18,8 @@ import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.TextWebSocketHandler
 import java.io.IOException
 import java.time.Instant
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.atomic.AtomicReference
 
 // 연결 하나의 상태: 인증 전 → 인증됨 (ADR 0031)
 @Component
@@ -30,10 +32,12 @@ class RealtimeWebSocketHandler(
 
     override fun afterConnectionEstablished(session: WebSocketSession) {
         log.info("ws connected: session={}", session.id)
+        session.attributes[AUTH_STATE] = AtomicReference(AuthState.PENDING)
         // ADR 0031: authTimeout 안에 AUTH가 오지 않으면 닫는다. 인증 없이 자리만 차지하는 연결을 막는다
         val timeoutTask = scheduler.schedule({
             if (!session.isOpen) return@schedule
-            if (session.principal() != null) return@schedule
+            // ADR 0044: 확인과 표시를 한 번에 한다. 실패했다면 AUTH가 먼저 AUTHENTICATED로 바꿨다
+            if (!session.authState().compareAndSet(AuthState.PENDING, AuthState.TIMED_OUT)) return@schedule
 
             log.info("ws auth timeout: session={}", session.id)
             try {
@@ -72,6 +76,7 @@ class RealtimeWebSocketHandler(
     }
 
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
+        session.timeoutTask()?.cancel(false) // 인증 전에 끊긴 연결의 예약도 정리한다
         log.info("ws closed: session={}, userId={}, status={}", session.id, session.principal()?.userId, status)
     }
 
@@ -88,6 +93,13 @@ class RealtimeWebSocketHandler(
             return
         }
 
+        // ADR 0044: 실패했다면 타임아웃이 먼저 TIMED_OUT으로 바꿨다. 닫히는 중이므로 AUTH_OK를 보내지 않는다
+        if (!session.authState().compareAndSet(AuthState.PENDING, AuthState.AUTHENTICATED)) {
+            log.info("ws auth lost to timeout: session={}", session.id)
+            return
+        }
+        // 이긴 뒤에는 타임아웃 작업이 할 일이 없다. 시작 전이면 예약을 지워 스케줄러 큐에서 뺀다
+        session.timeoutTask()?.cancel(false)
         session.attributes[PRINCIPAL] = RealtimePrincipal(verified.userId, deviceId)
         send(session, ServerFrame.AuthOk(verified.userId))
         log.info("ws authenticated: session={}, userId={}, deviceId={}", session.id, verified.userId, deviceId)
@@ -108,11 +120,20 @@ class RealtimeWebSocketHandler(
 
     private fun WebSocketSession.principal(): RealtimePrincipal? = attributes[PRINCIPAL] as RealtimePrincipal?
 
+    private fun WebSocketSession.timeoutTask(): ScheduledFuture<*>? = attributes[AUTH_TIMEOUT_TASK] as ScheduledFuture<*>?
+
+    @Suppress("UNCHECKED_CAST")
+    private fun WebSocketSession.authState(): AtomicReference<AuthState> = attributes[AUTH_STATE] as AtomicReference<AuthState>
+
     companion object {
         private const val PRINCIPAL = "realtime.principal"
         private const val AUTH_TIMEOUT_TASK = "realtime.authTimeoutTask"
+        private const val AUTH_STATE = "realtime.authState"
         private val json = Json { ignoreUnknownKeys = true }
     }
 }
+
+// ADR 0044: 타임아웃과 AUTH 중 먼저 PENDING에서 벗어난 쪽만 이긴다
+enum class AuthState { PENDING, AUTHENTICATED, TIMED_OUT }
 
 data class RealtimePrincipal(val userId: Long, val deviceId: String)
