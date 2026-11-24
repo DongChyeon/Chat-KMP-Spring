@@ -33,4 +33,8 @@ enum class ErrorCode {
     INVALID_CURSOR, // 앱이 보낸 커서를 해석할 수 없다 (ADR 0024)
     ALREADY_JOINED,
     DIRECT_ROOM_NOT_JOINABLE, // 1:1 방에는 다른 사용자가 참여할 수 없다 (ADR 0019)
+
+    // 메시지
+    INVALID_MESSAGE_CONTENT,
+    NOT_ROOM_MEMBER, // 참여하지 않았거나 나간 방 (ADR 0026)
 }
