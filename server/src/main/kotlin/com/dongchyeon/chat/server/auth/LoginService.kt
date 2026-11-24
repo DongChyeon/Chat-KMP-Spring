@@ -38,7 +38,7 @@ class LoginService(
         }
 
         val userId = checkNotNull(user.id)
-        val accessToken = jwtProvider.createAccessToken(userId)
+        val accessToken = jwtProvider.createAccessToken(userId, request.deviceId)
         val refreshToken = jwtProvider.createRefreshToken(userId)
 
         // 같은 기기에서 다시 로그인하면 기존 행을 갱신하고, 새 기기면 행을 추가한다 (ADR 0010: 기기별 저장)

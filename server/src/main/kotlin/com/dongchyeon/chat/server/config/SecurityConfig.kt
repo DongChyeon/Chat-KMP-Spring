@@ -2,7 +2,7 @@ package com.dongchyeon.chat.server.config
 
 import com.dongchyeon.chat.server.auth.JwtAuthenticationEntryPoint
 import com.dongchyeon.chat.server.auth.JwtAuthenticationFilter
-import com.dongchyeon.chat.server.auth.JwtProvider
+import com.dongchyeon.chat.server.auth.AccessTokenVerifier
 import com.dongchyeon.chat.shared.ApiPaths
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -16,7 +16,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 class SecurityConfig(
-    private val jwtProvider: JwtProvider,
+    private val accessTokenVerifier: AccessTokenVerifier,
     private val entryPoint: JwtAuthenticationEntryPoint,
 ) {
 
@@ -34,12 +34,14 @@ class SecurityConfig(
                 authorize(ApiPaths.INFO, permitAll)
                 authorize("/actuator/health", permitAll)
                 authorize("/error", permitAll)
+                // ADR 0031: 핸드셰이크는 열어 두고, 인증은 연결 후 AUTH 프레임으로 핸들러가 한다
+                authorize(ApiPaths.REALTIME, permitAll)
                 authorize(anyRequest, authenticated)
             }
             // 등록하지 않으면 기본값 Http403ForbiddenEntryPoint가 403과 Spring 기본 본문을 보낸다 (ADR 0013)
             exceptionHandling { authenticationEntryPoint = entryPoint }
             // 아이디/비밀번호 폼 로그인 필터 자리 앞에 끼워 넣는다. 인가 필터보다 먼저 실행되어야 한다
-            addFilterBefore<UsernamePasswordAuthenticationFilter>(JwtAuthenticationFilter(jwtProvider, entryPoint))
+            addFilterBefore<UsernamePasswordAuthenticationFilter>(JwtAuthenticationFilter(accessTokenVerifier, entryPoint))
         }
         return http.build()
     }

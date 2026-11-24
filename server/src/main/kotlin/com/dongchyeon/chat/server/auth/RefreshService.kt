@@ -21,16 +21,17 @@ class RefreshService(
 
     @Transactional(readOnly = true)
     fun refresh(request: RefreshRequest): TokenResponse {
-        val userId = verify(request.refreshToken)
+        val saved = verify(request.refreshToken)
         // ADR 0010: Refresh Token은 교체하지 않고 받은 값을 그대로 돌려준다
         return TokenResponse(
-            accessToken = jwtProvider.createAccessToken(userId),
+            // ADR 0033: 요청 본문이 아니라 저장된 행의 deviceId를 쓴다
+            accessToken = jwtProvider.createAccessToken(checkNotNull(saved.user.id), saved.deviceId),
             refreshToken = request.refreshToken,
         )
     }
 
-    /** Refresh Token을 검증하고 userId를 돌려준다. 실패 원인은 로그에만 남기고 [refreshFailed]를 던진다 (ADR 0014). */
-    private fun verify(refreshToken: String): Long {
+    /** Refresh Token을 검증하고 저장된 행을 돌려준다. 실패 원인은 로그에만 남기고 [refreshFailed]를 던진다 (ADR 0014). */
+    private fun verify(refreshToken: String): RefreshToken {
         val claims = try {
             jwtProvider.parse(refreshToken)
         } catch (e: ExpiredJwtException) {
@@ -49,12 +50,10 @@ class RefreshService(
             throw refreshFailed()
         }
 
-        if (refreshTokenRepository.findByTokenHash(TokenHasher.hash(refreshToken)) == null) {
+        return refreshTokenRepository.findByTokenHash(TokenHasher.hash(refreshToken)) ?: run {
             log.info("refresh failed: not in allowlist (userId={})", claims.subject)
             throw refreshFailed()
         }
-
-        return claims.subject.toLong()
     }
 
     private fun refreshFailed() =

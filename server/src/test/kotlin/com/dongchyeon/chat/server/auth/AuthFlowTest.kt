@@ -83,7 +83,7 @@ class AuthFlowTest(
         @Test
         fun `만료된 Access Token은 TOKEN_EXPIRED`() {
             val userId = signupAndLogin().userId
-            val expired = jwtProvider.createAccessToken(userId, now = Instant.now().minus(Duration.ofHours(1)))
+            val expired = jwtProvider.createAccessToken(userId, "phone", now = Instant.now().minus(Duration.ofHours(1)))
             getMe(expired).assertError(401, ErrorCode.TOKEN_EXPIRED)
         }
 
