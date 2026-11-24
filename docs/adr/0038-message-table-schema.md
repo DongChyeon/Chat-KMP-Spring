@@ -33,3 +33,5 @@ index idx_messages_room_id_id (room_id, id)
 > 이대로 진행할게
 
 ## 나중에 알게 된 것
+
+- ADR 0041로 종류 컬럼 `type`(`TEXT`/`JOIN`/`LEAVE`)이 추가되고, 입장/퇴장은 문구를 저장하지 않으므로 `content`는 null을 허용하게 바뀌었다. 길이 검증은 `TEXT`일 때만 한다.

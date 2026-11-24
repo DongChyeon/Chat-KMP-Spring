@@ -32,6 +32,11 @@ class ChatRoom(
     @Column(nullable = false, updatable = false)
     val createdAt: Instant = Instant.now()
 
+    // ADR 0040: 목록을 최근 메시지순으로 정렬하는 값. 메시지가 없는 방은 null.
+    // 연관관계 대신 id만 둔다. 정렬에만 쓰고 메시지 내용을 함께 읽지 않는다
+    var lastMessageId: Long? = null
+        protected set
+
     // 연관관계의 주인은 ChatRoomMember.room이다. 이 컬렉션은 읽기용이고, 참여는 ChatRoomMember를 저장해서 한다
     @OneToMany(mappedBy = "room")
     val members: MutableList<ChatRoomMember> = mutableListOf()
