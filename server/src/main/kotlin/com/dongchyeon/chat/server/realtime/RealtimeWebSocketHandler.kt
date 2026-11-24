@@ -16,6 +16,8 @@ import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.TextWebSocketHandler
+import java.io.IOException
+import java.time.Instant
 
 // 연결 하나의 상태: 인증 전 → 인증됨 (ADR 0031)
 @Component
@@ -28,8 +30,20 @@ class RealtimeWebSocketHandler(
 
     override fun afterConnectionEstablished(session: WebSocketSession) {
         log.info("ws connected: session={}", session.id)
-        // TODO(learn): properties.authTimeout 안에 AUTH가 오지 않으면 RealtimeCloseCode.AUTH_TIMEOUT으로 연결을 닫기
-        //  — 힌트: scheduler.schedule(작업, 실행 시각), 실행 시점에 아직 인증 전인지 확인(principal), 이미 닫혔다면?
+        // ADR 0031: authTimeout 안에 AUTH가 오지 않으면 닫는다. 인증 없이 자리만 차지하는 연결을 막는다
+        val timeoutTask = scheduler.schedule({
+            if (!session.isOpen) return@schedule
+            if (session.principal() != null) return@schedule
+
+            log.info("ws auth timeout: session={}", session.id)
+            try {
+                session.close(CloseStatus(RealtimeCloseCode.AUTH_TIMEOUT, "auth timeout"))
+            } catch (e: IOException) {
+                log.warn("ws close failed: session={}", session.id, e)
+            }
+        }, Instant.now().plus(properties.authTimeout))
+
+        session.attributes[AUTH_TIMEOUT_TASK] = timeoutTask
     }
 
     override fun handleTextMessage(session: WebSocketSession, message: TextMessage) {
@@ -96,6 +110,7 @@ class RealtimeWebSocketHandler(
 
     companion object {
         private const val PRINCIPAL = "realtime.principal"
+        private const val AUTH_TIMEOUT_TASK = "realtime.authTimeoutTask"
         private val json = Json { ignoreUnknownKeys = true }
     }
 }
