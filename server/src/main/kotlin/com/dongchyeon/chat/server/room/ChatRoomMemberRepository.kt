@@ -22,7 +22,6 @@ interface ChatRoomMemberRepository : JpaRepository<ChatRoomMember, Long> {
     fun findByRoomIdAndUserId(roomId: Long, userId: Long): ChatRoomMember?
 
     // ADR 0042: 재참여와 퇴장이 정확히 한 번만 성공하도록 참여 행을 잠그고 읽는다
-    // TODO(learn): 이 조회가 다른 트랜잭션이 커밋할 때까지 기다리게 만들기 — 힌트: UserRepository.findAllByIdForUpdate (ADR 0022)
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select m from ChatRoomMember m where m.room.id = :roomId and m.user.id = :userId")
     fun findByRoomIdAndUserIdForUpdate(roomId: Long, userId: Long): ChatRoomMember?
