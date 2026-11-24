@@ -2,6 +2,7 @@ package com.dongchyeon.chat.server.room
 
 import com.dongchyeon.chat.shared.ApiPaths
 import com.dongchyeon.chat.shared.auth.LoginRequest
+import com.dongchyeon.chat.shared.auth.RefreshRequest
 import com.dongchyeon.chat.shared.auth.SignupRequest
 import com.dongchyeon.chat.shared.auth.TokenResponse
 import com.dongchyeon.chat.shared.auth.UserResponse
@@ -29,6 +30,15 @@ class RoomTestClient(private val port: Int) {
         val user = Json.decodeFromString<UserResponse>(post(ApiPaths.SIGNUP, SignupRequest(email, PASSWORD, nickname)).body())
         val tokens = Json.decodeFromString<TokenResponse>(post(ApiPaths.LOGIN, LoginRequest(email, PASSWORD, "phone")).body())
         return TestUser(user.id, tokens.accessToken)
+    }
+
+    // 로그인 Access Token과 그 Refresh Token으로 재발급한 Access Token
+    fun loginAndRefresh(deviceId: String): Pair<String, String> {
+        val email = "room-${UUID.randomUUID()}@test.com"
+        post(ApiPaths.SIGNUP, SignupRequest(email, PASSWORD, "tester"))
+        val login = Json.decodeFromString<TokenResponse>(post(ApiPaths.LOGIN, LoginRequest(email, PASSWORD, deviceId)).body())
+        val refreshed = Json.decodeFromString<TokenResponse>(post(ApiPaths.REFRESH, RefreshRequest(login.refreshToken)).body())
+        return login.accessToken to refreshed.accessToken
     }
 
     fun createDirect(user: TestUser, targetUserId: Long) =
